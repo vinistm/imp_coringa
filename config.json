@@ -1,0 +1,14 @@
+{
+    "server": {
+        "driver": "SQL Server",
+        "host": "192.168.100.91",
+        "port": "1435",
+        "database": "LAFORTONLINE",
+        "username": "sa",
+        "password": "3864"
+    },
+    "filial_padrao": "LOJA REBOUCAS",
+    "filiais_disponiveis": [
+        "LAFORT ONLINE"
+    ]
+}

@@ -1,0 +1,4 @@
+PyQt5==5.15.9
+pyodbc==4.0.39
+pyinstaller==6.3.0
+pillow==10.2.0 
