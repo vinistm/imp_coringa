@@ -12,16 +12,16 @@ VSVersionInfo(
   kids=[
     StringFileInfo(
       [
-      StringTable(
-        u'040904B0',
-        [StringStruct(u'CompanyName', u'Lafort'),
-        StringStruct(u'FileDescription', u'RFID Coringa - Sistema de Controle de Produtos'),
-        StringStruct(u'FileVersion', u'1.0.0'),
-        StringStruct(u'InternalName', u'rfid_coringa'),
-        StringStruct(u'LegalCopyright', u'Copyright (c) 2024 Lafort'),
-        StringStruct(u'OriginalFilename', u'RFID Coringa.exe'),
-        StringStruct(u'ProductName', u'RFID Coringa'),
-        StringStruct(u'ProductVersion', u'1.0.0')])
+        StringTable(
+          u'040904B0',
+          [StringStruct(u'CompanyName', u'Coringa'),
+          StringStruct(u'FileDescription', u'Sistema Coringa'),
+          StringStruct(u'FileVersion', u'1.0.0'),
+          StringStruct(u'InternalName', u'main'),
+          StringStruct(u'LegalCopyright', u'Copyright (c) 2024'),
+          StringStruct(u'OriginalFilename', u'main.exe'),
+          StringStruct(u'ProductName', u'Sistema Coringa'),
+          StringStruct(u'ProductVersion', u'1.0.0')])
       ]), 
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]

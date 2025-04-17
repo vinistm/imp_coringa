@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QTableWidget, QTableWidgetItem, QMessageBox, QComboBox,
                            QGroupBox, QStackedWidget, QFrame, QSizePolicy)
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QPalette, QColor
+from PyQt5.QtGui import QFont, QPalette, QColor, QIcon
 from config_window import LoginDialog, ConfigWindow
 
 class ProdutoApp(QMainWindow):
@@ -18,6 +18,18 @@ class ProdutoApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("RFID Coringa")
         self.setMinimumSize(1024, 860) 
+        
+        # Inicializar variáveis
+        self.filiais = []
+        self.filial_padrao = ""
+        
+        # Configurar ícone da janela
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'logo.ico')
+        if not os.path.exists(icon_path):
+            # Se não encontrar no caminho absoluto, tenta no diretório atual
+            icon_path = os.path.join('assets', 'logo.ico')
+        
+        self.setWindowIcon(QIcon(icon_path))
         
         # Carregar configurações
         self.load_config()
@@ -137,6 +149,31 @@ class ProdutoApp(QMainWindow):
         layout.setContentsMargins(20, 20, 20, 20)
         
         
+        # Botão Voltar
+        voltar_button = QPushButton("← Voltar")
+        voltar_button.setFixedWidth(120)
+        voltar_button.clicked.connect(self.voltar_tela_inicial)
+        voltar_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #757575, stop:1 #616161);
+                color: white;
+                border: none;
+                border-radius: 15px;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 8px;
+                min-height: 30px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #616161, stop:1 #424242);
+                
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #424242, stop:1 #212121);
+            }
+        """)
+        
+        # Botão de configurações
         config_button = QPushButton("⚙️ Configurações")
         config_button.setFixedWidth(120)
         config_button.clicked.connect(self.show_config)
@@ -160,8 +197,9 @@ class ProdutoApp(QMainWindow):
             }
         """)
         
-        # Adicionar o botão ao layout principal
+        # Adicionar os botões ao layout principal
         title_layout = QHBoxLayout()
+        title_layout.addWidget(voltar_button)
         title_layout.addStretch()
         title_layout.addWidget(config_button)
         layout.insertLayout(0, title_layout)
@@ -204,6 +242,8 @@ class ProdutoApp(QMainWindow):
         codigo_layout.addWidget(self.codigo_input)
         campos_layout.addLayout(codigo_layout)
         
+        # Campo RFID
+                
         # Caso precise alterar alguma filial ou adicionar
         filial_layout = QVBoxLayout()
         filial_label = QLabel("Filial*")
@@ -486,6 +526,92 @@ class ProdutoApp(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao buscar produto: {str(e)}")
     
+    def verificar_rfid(self, rfid):
+        try:
+            conn = pyodbc.connect(self.conn_str)
+            cursor = conn.cursor()
+            
+            # Primeira consulta - Verificar EAN13
+            query_ean13 = """
+            SELECT EAN13, EPC 
+            FROM MEGA_EPC_DETALHE a 
+            JOIN MEGA_EPC b ON a.ID_EPC = b.ID_EPC  
+            WHERE EAN13 = ?
+            """
+            
+            cursor.execute(query_ean13, (self.codigo_barra_atual,))
+            resultado_ean13 = cursor.fetchone()
+            
+            if resultado_ean13:
+                # Encontrou correspondência - Mudar cor do campo para verde
+                self.rfid_input.setStyleSheet("""
+                    QLineEdit {
+                        background-color: #e8f5e9;
+                        border: 2px solid #4caf50;
+                        border-radius: 8px;
+                        padding: 8px;
+                    }
+                """)
+                return True
+            
+            # Segunda consulta - Verificar produto por código de barras
+            query_produto = """
+            SELECT A.*
+            FROM PRODUTOS_BARRA A
+            CROSS APPLY (
+                SELECT PRODUTO, COR_PRODUTO, TAMANHO 
+                FROM PRODUTOS_BARRA 
+                WHERE CODIGO_BARRA = ?
+            ) B
+            WHERE A.PRODUTO = B.PRODUTO
+              AND A.COR_PRODUTO = B.COR_PRODUTO
+              AND A.TAMANHO = B.TAMANHO
+              AND A.TIPO_COD_BAR = '3'
+            """
+            
+            cursor.execute(query_produto, (self.codigo_barra_atual,))
+            resultado_produto = cursor.fetchone()
+            
+            if resultado_produto:
+                # Encontrou correspondência - Mudar cor do campo para verde
+                self.rfid_input.setStyleSheet("""
+                    QLineEdit {
+                        background-color: #e8f5e9;
+                        border: 2px solid #4caf50;
+                        border-radius: 8px;
+                        padding: 8px;
+                    }
+                """)
+                return True
+            
+            # Se não encontrou correspondência, manter cor padrão
+            self.rfid_input.setStyleSheet("""
+                QLineEdit {
+                    background-color: #f5f5f5;
+                    border: 2px solid #ddd;
+                    border-radius: 8px;
+                    padding: 8px;
+                }
+            """)
+            return False
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao verificar RFID: {str(e)}")
+            return False
+        finally:
+            conn.close()
+    
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+            if self.rfid_input.hasFocus():
+                rfid = self.rfid_input.text().strip()
+                if rfid:
+                    self.verificar_rfid(rfid)
+                    # Limpar o campo após a leitura
+                    self.rfid_input.clear()
+                    # Voltar o foco para o campo RFID
+                    self.rfid_input.setFocus()
+    
     def vincular_rfid(self):
         try:
             if not self.rfid_input.text().strip():
@@ -512,7 +638,7 @@ class ProdutoApp(QMainWindow):
             codigo_filial = resultado[0]
             print(f"Código da filial: {codigo_filial}")
             
-            chave = f"ORDEM_PRODUCAO=[{self.rfid_input.text().strip()}] FILIAL=[{filial}] Usuario: CORINGA"
+            chave = f"IMPRESSAO CORINGA=[{self.rfid_input.text().strip()}] FILIAL=[{filial}]"
             print(f"Chave montada: {chave}")
             
             try:
@@ -595,7 +721,7 @@ class ProdutoApp(QMainWindow):
                                 INSERT INTO MEGA_EPC_DETALHE 
                                 (ID_EPC, PRODUTO, COR_PRODUTO, TAMANHO, MATERIAL, COR_MATERIAL, 
                                  EAN13, SERIAL, ATUALIZACAO, COD_FILIAL, ULTIMO_TIPO_MOV, INATIVO)
-                                VALUES (?, ?, ?, ?, NULL, NULL, ?, '1', ?, ?, 'I', '0')
+                                VALUES (?, ?, ?, ?, NULL, NULL, ?, '1', ?, ?, 'J', '0')
                             """, (novo_id_epc, self.produto_atual, self.cor_atual, self.tamanho_atual, 
                                  codigo_barra_padrao, data_atual, codigo_filial))
                             
@@ -729,15 +855,23 @@ class ProdutoApp(QMainWindow):
                     # Configurar string de conexão
                     self.conn_str = (
                         f"DRIVER={{{config['server']['driver']}}};"
-                        f"SERVER={config['server']['host']},{config['server']['port']};"
-                        f"DATABASE={config['server']['database']};"
+                        f"SERVER={config['server']['host']}"
+                    )
+                    
+                    # Adicionar porta apenas se existir
+                    if 'port' in config['server'] and config['server']['port']:
+                        self.conn_str += f",{config['server']['port']}"
+                    
+                    # Completar string de conexão
+                    self.conn_str += (
+                        f";DATABASE={config['server']['database']};"
                         f"UID={config['server']['username']};"
                         f"PWD={config['server']['password']}"
                     )
                     
-                    # Atualizar lista de filiais
-                    self.filiais = config['filiais_disponiveis']
-                    self.filial_padrao = config.get('filial_padrao', self.filiais[0] if self.filiais else '')
+                    # Inicializar lista de filiais
+                    self.filiais = config.get('filiais_disponiveis', [])
+                    self.filial_padrao = config.get('filial_padrao', '')
                     
                     return True
             return False
@@ -768,6 +902,12 @@ class ProdutoApp(QMainWindow):
                             self.filial_avancada_combo.setCurrentIndex(index)
                     
                     QMessageBox.information(self, "Sucesso", "Configurações atualizadas com sucesso!")
+
+    def voltar_tela_inicial(self):
+        from tela_inicial import TelaInicial
+        self.tela_inicial = TelaInicial()
+        self.tela_inicial.show()
+        self.close()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
